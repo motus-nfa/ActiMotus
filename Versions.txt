@@ -1,0 +1,52 @@
+====================================================================================================
+					  Offline version
+====================================================================================================
+Version 1.2.2
+	Features
+		- Added new auto reference angle detection
+	  	  Add description of the reference angle
+	Other
+		- Bug fixes
+
+Version 1.2.1
+	Features
+		- Add kneel detection (not validated at this point)
+	Other
+		- Add docstrings
+		- Bug fixes
+
+Version 1.2.0
+	Features
+	Other
+
+Version 1.1.1 to 1.1.3
+	Features
+		- Add 12.5 Hz detection function
+		- New reference angle
+		  Tested on data by using manual reference angles as labels.
+	Other
+		- Preliminary changes to 12.5 Hz activity detection
+		- Improve structure such that postprocessing steps are in its own file
+		- Bug fixes
+
+====================================================================================================
+					  Backend version
+====================================================================================================
+Version 1.2.0
+	Features
+		- Reference angle computes in step 2 (from variables extracted from step 1)
+		- New polynomial for 12.5 Hz
+	Other
+
+Version 1.1.3
+	Features
+		- Auto reference angle
+		- Add 12.5 Hz compatibility
+	Other
+		- Add header
+====================================================================================================
+						SKABELON
+====================================================================================================
+Version x.x.x.
+	Features
+	Other
