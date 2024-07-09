@@ -1,0 +1,9 @@
+cff-version: 1.2.0
+message: "If you use Motus in your research please cite the system as follows"
+authors:
+- family-names: "The National Research Centre for the Working Environment (NFA)"
+  given-names: ""
+title: "ActiMotus"
+version: 2.0.0
+date-released: 2024-08-01
+url: "https://github.com/motus-nfa/ActiMotus"

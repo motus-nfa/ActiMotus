@@ -1,19 +1,17 @@
 import numpy
 import numpy as np
-from functions.Motus_backend import motus_step2_ergoconnect
-from functions.Compute_Exposures_ErgoConnect import Compute_Exposures
+from functions.Motus_backend import motus_step2_3sensors, Compute_Exposures
 
 
 # -*- coding: utf-8 -*-
 """
-Copyright (C) 2023 Det National Forskningscenter for Arbejdsmiljø
-Dette prograh er skabt på baggrund af Acti4/Motus algoritmen, og udarbejdet til brug i sammenhæng med alg_chunk_motus_pre_v1_2_0.
+Copyright (C) 2023 Det Nationale Forskningscenter for Arbejdsmiljø
 
 Version: 2.0.0
 """
 
 
-class ActivityMotus_v2_0_0_ErgoConnect:
+class ActivityMotus_v2_0_0:
     """
     Acticity/Step classification skeleton for Motus. (Runs on 1s values (n))
 
@@ -71,7 +69,7 @@ class ActivityMotus_v2_0_0_ErgoConnect:
         cls, ts_list, data_list, parameters, debug_stream=None, debug_chunks=None
     ):
 
-        ts_chunked, out_cat, out_val, out_ver = motus_step2_ergoconnect(
+        ts_chunked, out_cat, out_val, out_ver = motus_step2_3sensors(
             cls, ts_list, data_list, parameters
         )
 

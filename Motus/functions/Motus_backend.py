@@ -11,8 +11,9 @@ from .backendfunctions import (
     ref_angle_auto_thigh_1hz,
     Flipthigh_1hz,
     FlipTrunk_insideout,
+    downsample,
 )
-from .Motus_Core import NotWorn, detect_SF12, downsample, BoutFilter
+from .Motus_Core import NotWorn, detect_SF12, BoutFilter
 
 # Import other modules
 import numpy as np
@@ -72,7 +73,7 @@ def motus_step1(cls, ts_list, data_list, SF=30):
     NonWear = NotWorn(Acc, SF, Tid)
 
     # Downsample to 1 Hz
-    Mean, Std, Acc12 = downsample(Acc, SF, SF12)
+    Mean, Std, Acc12 = downsample(Acc, SF)
 
     # Compute values for cycling and step detection
     Iws, Irun, hlratio = CycleStepSplit1(Acc, Mean, Std, SF, X)
@@ -130,7 +131,7 @@ def motus_step1(cls, ts_list, data_list, SF=30):
     return ts_chunked, out_cat, out_val, out_ver
 
 
-def motus_step2_ergoconnect(cls, ts_list, data_list, parameters, SF=30):
+def motus_step2_3sensors(cls, ts_list, data_list, parameters, SF=30):
 
     ts_comb = get_ts(ts_list)  # If outputs from pre steps are not of equal length
 
@@ -217,71 +218,7 @@ def motus_step2_thighonly(cls, ts_list, data_list, parameters, SF=30):
 
     return ts_comb, out_cat, out_val, out_ver
 
-def motus_step2_4sensors(cls, ts_list, data_list, parameters, SF=30):
 
-    ts_comb = get_ts(ts_list)  # If outputs from pre steps are not of equal length
-
-    # Prepare out variables
-    out_cat = np.zeros(shape=len(ts_comb), dtype=np.int32)
-    # out_val = np.zeros([len(ts_comb), len(cls.output_values)], dtype=np.float32)
-    out_val = np.full([len(ts_comb), len(cls.output_values)], fill_value=np.nan)
-    out_ver = np.zeros([len(ts_comb), len(cls.output_verbose)], dtype=np.float32)
-
-    FBThigh = np.full(shape=len(ts_comb), fill_value=np.nan)
-
-    if data_list[0] is not None:
-        # Thigh process
-        out_cat, out_val, FBThigh, MeanThigh = thigh_process(
-                                            cls,
-                                            ts_list,
-                                            data_list,
-                                            parameters,
-                                            out_cat,
-                                            out_val,
-                                            out_ver,
-                                            ts_comb,
-                                            FBThigh=FBThigh)
-
-    if data_list[1] is not None:
-        # Trunk process
-        out_cat, out_val = trunk_process(
-                                    cls,
-                                    ts_list,
-                                    data_list,
-                                    parameters,
-                                    out_cat,
-                                    out_val,
-                                    out_ver,
-                                    ts_comb,
-                                    FBThigh=FBThigh)
-
-
-    if data_list[2] is not None:
-        # Arm process
-        out_val = arm_process(cls,
-                        ts_list,
-                        data_list,
-                        parameters,
-                        out_cat,
-                        out_val,
-                        out_ver,
-                        ts_comb)
-
-    if (data_list[3] is not None) and (data_list[0] is not None): #calf dependent on thigh
-        # Calf process
-        out_cat, out_val = calf_process(cls,
-                                        ts_list,
-                                        data_list,
-                                        parameters,
-                                        out_cat,
-                                        out_val,
-                                        out_ver,
-                                        ts_comb,
-                                        MeanThigh=MeanThigh)
-
-    out_cat = out_cat.flatten()
-
-    return ts_comb, out_cat, out_val, out_ver
 
 
 def thigh_process(
@@ -331,6 +268,8 @@ def thigh_process(
     zSqsum = Datain[:, 13]
     xzsum = Datain[:, 14]
 
+    SF12 = Datain[0, 15]
+
     # Flip should go here
     Mean = Flipthigh_1hz(Mean)
 
@@ -338,6 +277,11 @@ def thigh_process(
 
     Std, Mean = rotate_split(
         ref_angle * (np.pi / 180), xsum, zsum, xSqsum, zSqsum, xzsum, Std, Mean)
+    
+    if SF12:
+        Std = 1.14*Std + 0.02*np.square(Std)
+    else:
+        Std = 1.03*Std + 0.18*np.square(Std)
 
     Comb, ThighFB = ActivityDetectSplit(Mean, Std, hlratio)
 
@@ -616,122 +560,98 @@ def arm_process(cls,
     
 
 
-def calf_process(cls,
-    ts_list,
-    data_list,
-    parameters,
-    out_cat,
-    out_val,
-    out_ver,
-    ts_comb,
-    MeanThigh):
-
-    #initialize variables from Datain
-    ts_chunked = ts_list[1]
-    Datain = data_list[1][:, 1:] * 0.000001
-
-    ts_chunked = ts_chunked[np.argsort(ts_chunked)]
-    Datain = Datain[np.argsort(ts_chunked)]
-    
-    startidx = np.argmin(abs(ts_chunked.min()-ts_comb))
-    
-    ts_idx = (
-        find_nearest_timestamp(ts_comb[startidx:], ts_chunked) 
-    )
-
-    ts_chunked = ts_chunked[ts_idx]
-    Datain = Datain[ts_idx]
-    
-    endidx = startidx + len(ts_chunked)
-
-    out_cat_copy = np.copy(out_cat)
-    out_cat_copy = out_cat_copy[startidx:endidx]
-
-    Stdx = Datain[:, 0]
-    Stdy = Datain[:, 1]
-    Stdz = Datain[:, 2]
-    Std = np.array([Stdx, Stdy, Stdz]).T
-
-    Meanx = Datain[:, 3]
-    Meany = Datain[:, 4]
-    Meanz = Datain[:, 5]
-    Mean = np.array([Meanx, Meany, Meanz]).T
-
-    NonWear = Datain[:, 9]
-
-    Mean = array(Mean)
-
-    FlipUD_Calf = Flip_UpsideDown(Mean)
-    if FlipUD_Calf:
-        Mean[:,-3:] = Mean[:,-3:]*np.array([-1, -1, 1])
-        
-    #update Akt
-    out_cat = KneelSquatDetection(out_cat, MeanThigh, Mean)
-
-    return out_cat, out_val
 
 
 
-def KneelSquatDetection(Akt, MeanThigh, MeanCalf, OffCalf=None):
+def Compute_Exposures(cat, val):
+    """
+    Compute the exposures needed for the ErgoConnect project, based on the 1Hz data 
+    output from step 2. 
+
+
+    Parameters
+    ----------
+    cat : numpy array
+        length same as ts.
+    val : numpy array
+        with columns corresponding to
+        ["activity/steps/count", "angle/TrunkInc", 
+         "angle/TrunkFB", "angle/TrunkLat", "angle/ArmInc"].
+
+    Returns
+    -------
+    out : TYPE
+        DESCRIPTION.
+
+    """
+
     import numpy as np
-    from scipy import signal 
-
-    LngThigh = np.sqrt(np.square(MeanThigh[:, 0]) + np.square(MeanThigh[:, 1]) + np.square(MeanThigh[:, 2]))
-    LngCalf = np.sqrt(np.square(MeanCalf[:, 0]) + np.square(MeanCalf[:, 1]) + np.square(MeanCalf[:, 2]))
-
-    IncThigh = np.arccos(np.divide(MeanThigh[:, 0], LngThigh))*180/np.pi
-    IncCalf = np.arccos(np.divide(MeanCalf[:, 0], LngCalf))*180/np.pi
-
-    FBThigh = -np.arcsin(np.divide(MeanThigh[:, 2], LngThigh))*180/np.pi
-    FBCalf = -np.arcsin(np.divide(MeanCalf[:, 2], LngCalf))*180/np.pi
-
-    LatThigh = -np.arcsin(np.divide(MeanThigh[:, 1], LngThigh))*180/np.pi
+    import pandas as pd
     
-    if OffCalf is None:
-        OffCalf = np.zeros(len(MeanThigh))
-    
-    kneel = np.all([IncCalf>=84, 
-                    FBCalf>45, 
-                    FBThigh>-20, 
-                    abs(LatThigh)<30, 
-                    Akt>1,
-                    OffCalf==0], axis=0)
-    
-    #determine constant in linear equation! 
-    squat = np.all([IncCalf<84, 
-                    IncCalf>=-1.5*IncThigh+187, 
-                    FBCalf>0, 
-                    IncCalf>32,
-                    OffCalf==0], axis=0)
-    
-    
-    #maybe include median filtering. Short bouts of actual kneeling and squatting will disappear though. 
-    # kneel = signal.medfilt(kneel*1, 5).astype(bool)
-    # squat = signal.medfilt(squat*1, 5).astype(bool)
+    out = np.c_[cat, val] 
+    out = pd.DataFrame(out, columns=['Activity', 'TrunkInc', "TrunkFB", "TrunkLat", "ArmInc"])
 
-    #insert in Akt
-    Akt[kneel] = 21
-    Akt[squat] = 22
+    out['Sedentary_time'] = np.any([out.Activity == 1, out.Activity == 2], axis=0)*1
+    out['Standing_time'] = np.any([out.Activity == 3, out.Activity == 4], axis=0)*1
+    out['Walking_time'] = (out.Activity == 5)*1
 
 
+    #Nrisesit
+    DiffAkt = (out["Activity"].isin([1,2]) * 1).to_numpy()
+    DiffAkt = np.diff(DiffAkt, prepend=DiffAkt[0])
+    out['Rise_from_sedentary_number'] = (DiffAkt == -1)*1
 
-    # # Find and cancel false 'kneel' embedded in sitting intervals (sitting with calf underneath)
-    # # Necessary?? Doesnt work yet
-    # SitKneel = np.zeros(len(Akt))
-    # SitKneel[Akt==2] = 1
-    # SitKneel[Akt==21] = -1
-    # SitKneel = np.append(0, SitKneel)
+    ThresTrunk = np.array([30, 60, 180])
+    ThresArm = np.array([30, 60, 90, 180])
 
-    # # Detect transitions from sitting to kneeling and update activity labels accordingly
-    # kneel2sit = np.where(np.diff(SitKneel) == 2)[0]
-    # sit2kneel = np.where(np.diff(SitKneel) == -2)[0]
+    for idx in range(len(ThresTrunk) - 1):
+        out[f'Forward_Bending_{ThresTrunk[idx]}_to_{ThresTrunk[idx+1]}_time'] = np.all(
+            [
+                out.Activity > 2,
+                out.Activity < 8,
+                out.TrunkFB > 0,
+                out.TrunkInc >= ThresTrunk[idx],
+                out.TrunkInc <= ThresTrunk[idx + 1],
+            ],
+            axis=0,
+        )*1
+    forward45 = np.all(
+            [
+                out.Activity > 2,
+                out.Activity < 8,
+                out.TrunkFB > 0,
+                out.TrunkInc >= 45,
+                out.TrunkInc <= 180,
+            ],
+            axis=0,
+        )
 
-    # for i in range(len(sit2kneel)):
-    #     if np.ptp(IncThigh[max(sit2kneel[i]-3,1):min(sit2kneel[i]+2,len(Akt))],axis=0) < 30:
-    #         NextKneel2Sit = kneel2sit[np.where(kneel2sit > sit2kneel[i])[0][0]]
-    #     if ((NextKneel2Sit.size != 0) & 
-    #         (Akt[sit2kneel[i]:NextKneel2Sit-1]==2).all() & 
-    #         np.ptp(IncThigh[max(NextKneel2Sit[i]-3,1):min(NextKneel2Sit[i]+2,len(Akt))],axis=0)) < 30:
-    #         Akt[sit2kneel[i]:NextKneel2Sit-1] = 2
+    # out['forward45'] = forward45
+    Diff45 = np.diff(forward45, prepend=0)
+    # out['diff45'] = Diff45
+    # Start = (np.array(np.nonzero(Diff45 == 1)))[0]
+    # Slut = (np.array(np.nonzero(Diff45 == -1)) - 1)[0]
+    # SSdur = Slut - Start + 1
 
-    return Akt
+    # crossing 45 from below 
+    #up45 = (np.array(angles[1:]) > 45) & (np.array(angles[:-1]) <= 45)
+    # up45 = np.insert(up45, 0, 0)
+    #crossing 30 from above
+    #down30 = (np.array(angles[1:]) < 30) & (np.array(angles[:-1]) >= 30)
+    #down30 = np.insert(down30, 0, 0)
+
+    out['Forward_Bending_45_to_180_number'] = (Diff45 == 1)*1
+
+    for idx in range(len(ThresArm) - 1):
+        out[f'Arm_Lifting_{ThresArm[idx]}_to_{ThresArm[idx+1]}_time'] = np.all(
+            [
+                out.Activity > 2,
+                out.Activity < 6,
+                out.ArmInc >= ThresArm[idx],
+                out.ArmInc <= ThresArm[idx + 1],
+            ],
+            axis=0,
+        )*1
+
+    return out
+

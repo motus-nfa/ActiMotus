@@ -1287,7 +1287,7 @@ def detect_SF12(ts):
         # Print a warning if the detected frequency is neither 12.5 Hz nor 25 Hz
         print("Hardware frequency seems to be neither 12.5 Hz nor 25 Hz")
         print(f"{freq=}")
-        return None
+        return False, freq
 
 
 def ref_angle_from_ref_position(Acc):
