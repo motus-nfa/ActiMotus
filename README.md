@@ -17,7 +17,7 @@ Motus is an activity detection system developed by the National Research Centre 
 In this repository you can find the Motus source code.
 
 ## Citing ActiMotus
-If you use Motus in your research please cite the system as follows:
+If you use ActiMotus in your research please cite the system as follows:
 
 APA
 ```
