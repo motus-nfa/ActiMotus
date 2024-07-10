@@ -48,7 +48,7 @@ Step 1 reads the raw data in 12 hour chunks and runs pre-processing steps. These
 - Computing metrics used in the detection of cycling, estimation of the step count and in rotating the data based on a reference angle. These metrics are used in place of the raw data, which is unavailable in the second step. 
 
 The outputs from the processing of step 1 are used as inputs to step 2. In step 2 multiple chunks are read simultaneously such that data is processed for 24 hours at a time. 
-In the second step, the sensor placement is revealed and, depending on this, different processes are activated. From a thigh worn accelerometer, the primary physical activities are classified using the Acti4 algorithm. Further sensors both improve the primary classification and produces angle-inclination signals. The output of step 2 is thus the classified activities on a second to second basis, along with step counts and angle signals (also on a second to second basis). 
+In the second step, the sensor placement is revealed and, depending on this, different processes are activated. From a thigh worn accelerometer, the primary physical activities are classified using the Acti4 algorithm. Further sensors both improve the primary classification and produce angle-inclination signals. The output of step 2 is thus the classified activities on a second to second basis, along with step counts and angle signals (also on a second to second basis). 
 
 
 ### Sensor placements
