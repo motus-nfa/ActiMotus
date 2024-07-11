@@ -57,7 +57,6 @@ class ActivityMotus_v1_2_0:
     ]
     output_values = ["activity/steps/count"]
 
-
     output_verbose = []
 
     #  THE MAIN FUNCTION
@@ -65,7 +64,6 @@ class ActivityMotus_v1_2_0:
     def analyse_data_list_new(
         cls, ts_list, data_list, parameters, debug_stream=None, debug_chunks=None
     ):
-
         ts_chunked, out_cat, out_val, out_ver = motus_step2_thighonly(
             cls, ts_list, data_list, parameters
         )
