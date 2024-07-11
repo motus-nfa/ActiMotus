@@ -69,7 +69,6 @@ class ChunkMotusPre_v2_0_0:
     def analyse_data_list_new(
         cls, ts_list, data_list, debug_stream=None, debug_chunks=None
     ):
-
         ts_chunked, out_cat, out_val, out_ver = motus_step1(cls, ts_list, data_list)
 
         return (

@@ -42,25 +42,6 @@
 
 import numpy as np
 
-def array(*args, **kwargs):
-    """
-    Create a NumPy array with default dtype set to np.float32.
-
-    Parameters
-    ----------
-    *args : array_like
-        Positional arguments passed to np.array.
-    **kwargs : dict
-        Keyword arguments passed to np.array.
-
-    Returns
-    -------
-    np.ndarray
-        NumPy array with the specified arguments and default dtype.
-    """
-    kwargs.setdefault("dtype", np.float32)
-    return np.array(*args, **kwargs)
-
 
 def chunk_ts(ts, sz):
     """
@@ -758,96 +739,16 @@ def Flipthigh_1hz(Mean):
 
 
 def FlipTrunk_insideout(Acc):
-    """"
+    """ "
     Insert acc data from reference position. Check if, when bending forward, that the sensor is not attached insideout
     """
-    
-    Z_median = np.median(Acc[:,-1])
 
-    #we maybe need to doublecheck if this is correct 
+    Z_median = np.median(Acc[:, -1])
+
+    # we maybe need to doublecheck if this is correct
     if Z_median > 0:
         Flip = 1
     else:
         Flip = 0
-    
 
     return Flip
-
-def downsample(Acc, SF):
-    """
-    Takes the 30Hz data down to 1Hz. This function is a collection of code previously present in
-    other functions.
-    The correctional polynomial on std for Sens and Sens 12.5Hz is applied here
-
-    Parameters
-    ----------
-    Acc : numpy array Nx3
-        Acceleration data.
-    SF : int
-        System sampling frequency (30Hz).
-
-    Returns
-    -------
-    Mean : numpy array nx3
-        mean of filtered 2 second windows of acceleration.
-    Std : numpy array nx3
-        standard deviation of filtered 2 second windows of acceleration.
-    Acc12 : numpy array nx3
-        downsampled acc data.
-
-    """
-    import numpy as np
-    from scipy import signal
-
-    # Butterworth filtering/ 5 Hz lowpass filtering
-    Bl, Al = signal.butter(4, 5 / (SF / 2), "low")  # butterworth filter coefficients
-    AccL = signal.lfilter(
-        Bl, Al, Acc, axis=0
-    )  # filter using coefficients using rational transfer function
-
-    Acc12 = Acc60(AccL, SF)  # reshape Acc into a 3 dimensional array
-    del AccL
-
-    Std = np.std(
-        Acc12, axis=0, ddof=1
-    )  # compute standard deviation of columns. The array is automatically squeezed intop a 2d array
-
-    Mean = np.mean(Acc12, axis=0)  # compute mean of 2 sec intervals
-
-    return Mean, Std, Acc12
-
-def Acc60(Acc, SF):
-    """
-    This function creates a tensor in order to compute mean and std of samples for 2 overlapping seconds.
-    A built in function (pd.rolling or np.convolve) should be able to replace it.
-
-    Parameters
-    ----------
-    Acc : numpy array nx3
-        Acceleration in 30Hz
-    SF : int
-        System sampling frequency. Hard wired to 30Hz
-
-    Returns
-    -------
-    Acc12 : numpy array nx3
-        Downsampled acceleration signal
-
-    """
-    import numpy as np
-
-    # Rearrange data in Acc matrix into 3-dimensional array
-
-    Acc1 = np.concatenate((Acc[0:SF], Acc), axis=0, dtype=np.float32)  # Pad before
-    Acc2 = np.concatenate((Acc, Acc[-SF:]), axis=0, dtype=np.float32)  # Pad after
-    Acc12 = np.concatenate(
-        (
-            np.reshape(Acc1, (SF, -1, 3), order="F"),
-            np.reshape(Acc2, (SF, -1, 3), order="F"),
-        ),
-        axis=0,
-        dtype=np.float32,
-    )  # Reshape into tensor
-    del Acc1, Acc2  # Delete unused matrices
-    Acc12 = Acc12[:, 0:-1, :]  # Slice
-    return Acc12

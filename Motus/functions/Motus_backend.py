@@ -1,8 +1,7 @@
 # Import Motus files
-from .preprocessing import AdjustRawBinData, Flip, Flip_UpsideDown
+from .preprocessing import AdjustRawBinData, Flip, Flip_UpsideDown, array
 from .backendfunctions import (
     CycleStepSplit1,
-    array,
     chunk_ts,
     ActivityDetectSplit,
     LyingSplit,
@@ -11,13 +10,13 @@ from .backendfunctions import (
     ref_angle_auto_thigh_1hz,
     Flipthigh_1hz,
     FlipTrunk_insideout,
-    downsample,
 )
-from .Motus_Core import NotWorn, detect_SF12, BoutFilter
+from .Motus_Core import NotWorn, detect_SF12, BoutFilter, downsample, adjust_std
 
 # Import other modules
 import numpy as np
 import bisect
+
 
 def find_nearest_timestamp(ts_comb, ts_chunked):
     """
@@ -39,8 +38,8 @@ def find_nearest_timestamp(ts_comb, ts_chunked):
                 nearest_indices.append(nearest_index - 1)
     return nearest_indices
 
-def get_ts(ts_list):
 
+def get_ts(ts_list):
     lo = np.min(np.concatenate(ts_list))
     hi = np.max(np.concatenate(ts_list))
 
@@ -132,7 +131,6 @@ def motus_step1(cls, ts_list, data_list, SF=30):
 
 
 def motus_step2_3sensors(cls, ts_list, data_list, parameters, SF=30):
-
     ts_comb = get_ts(ts_list)  # If outputs from pre steps are not of equal length
 
     # Prepare out variables
@@ -145,52 +143,44 @@ def motus_step2_3sensors(cls, ts_list, data_list, parameters, SF=30):
 
     if data_list[0] is not None:
         # Thigh process
-        out_cat, out_val, FBThigh = thigh_process(
-                                            cls,
-                                            ts_list,
-                                            data_list,
-                                            parameters,
-                                            out_cat,
-                                            out_val,
-                                            out_ver,
-                                            ts_comb,
-                                            FBThigh=FBThigh)
+        out_cat, out_val, FBThigh, _ = thigh_process(
+            cls,
+            ts_list,
+            data_list,
+            parameters,
+            out_cat,
+            out_val,
+            out_ver,
+            ts_comb,
+            FBThigh=FBThigh,
+        )
 
     if data_list[1] is not None:
         # Trunk process
         out_cat, out_val = trunk_process(
-                                    cls,
-                                    ts_list,
-                                    data_list,
-                                    parameters,
-                                    out_cat,
-                                    out_val,
-                                    out_ver,
-                                    ts_comb,
-                                    FBThigh=FBThigh)
-
+            cls,
+            ts_list,
+            data_list,
+            parameters,
+            out_cat,
+            out_val,
+            out_ver,
+            ts_comb,
+            FBThigh=FBThigh,
+        )
 
     if data_list[2] is not None:
         # Arm process
-        out_val = arm_process(cls,
-                        ts_list,
-                        data_list,
-                        parameters,
-                        out_cat,
-                        out_val,
-                        out_ver,
-                        ts_comb)
-
-    if data_list[3] is not None:
-        # Calf process
-        calf_process(cls, ts_list, data_list, parameters)
+        out_val = arm_process(
+            cls, ts_list, data_list, parameters, out_cat, out_val, out_ver, ts_comb
+        )
 
     out_cat = out_cat.flatten()
 
     return ts_comb, out_cat, out_val, out_ver
 
-def motus_step2_thighonly(cls, ts_list, data_list, parameters, SF=30):
 
+def motus_step2_thighonly(cls, ts_list, data_list, parameters, SF=30):
     ts_comb = ts_list[0]  # If outputs from pre steps are not of equal length
 
     # Prepare out variables
@@ -203,34 +193,25 @@ def motus_step2_thighonly(cls, ts_list, data_list, parameters, SF=30):
 
     if data_list[0] is not None:
         # Thigh process
-        out_cat, out_val, FBThigh = thigh_process(
-                                            cls,
-                                            ts_list,
-                                            data_list,
-                                            parameters,
-                                            out_cat,
-                                            out_val,
-                                            out_ver,
-                                            ts_comb,
-                                            FBThigh=FBThigh)
+        out_cat, out_val, FBThigh, _ = thigh_process(
+            cls,
+            ts_list,
+            data_list,
+            parameters,
+            out_cat,
+            out_val,
+            out_ver,
+            ts_comb,
+            FBThigh=FBThigh,
+        )
 
     out_cat = out_cat.flatten()
 
     return ts_comb, out_cat, out_val, out_ver
 
 
-
-
 def thigh_process(
-    cls,
-    ts_list,
-    data_list,
-    parameters,
-    out_cat,
-    out_val,
-    out_ver,
-    ts_comb,
-    FBThigh
+    cls, ts_list, data_list, parameters, out_cat, out_val, out_ver, ts_comb, FBThigh
 ):
     ts_chunked = ts_list[0]
     Datain = data_list[0][:, 1:] * 0.000001
@@ -276,12 +257,11 @@ def thigh_process(
     ref_angle = ref_angle_auto_thigh_1hz(Mean, Std, iterative=None)
 
     Std, Mean = rotate_split(
-        ref_angle * (np.pi / 180), xsum, zsum, xSqsum, zSqsum, xzsum, Std, Mean)
-    
-    if SF12:
-        Std = 1.14*Std + 0.02*np.square(Std)
-    else:
-        Std = 1.03*Std + 0.18*np.square(Std)
+        ref_angle * (np.pi / 180), xsum, zsum, xSqsum, zSqsum, xzsum, Std, Mean
+    )
+
+    # Adjusts std based on sampling frequency
+    Std = adjust_std(Std, SF12)
 
     Comb, ThighFB = ActivityDetectSplit(Mean, Std, hlratio)
 
@@ -317,32 +297,23 @@ def thigh_process(
     return out_cat, out_val, FBThigh, Mean
 
 
-def trunk_process(cls,
-    ts_list,
-    data_list,
-    parameters,
-    out_cat,
-    out_val,
-    out_ver,
-    ts_comb,
-    FBThigh):
-
-    #initialize variables from Datain
+def trunk_process(
+    cls, ts_list, data_list, parameters, out_cat, out_val, out_ver, ts_comb, FBThigh
+):
+    # initialize variables from Datain
     ts_chunked = ts_list[1]
     Datain = data_list[1][:, 1:] * 0.000001
 
     ts_chunked = ts_chunked[np.argsort(ts_chunked)]
     Datain = Datain[np.argsort(ts_chunked)]
-    
-    startidx = np.argmin(abs(ts_chunked.min()-ts_comb))
-    
-    ts_idx = (
-        find_nearest_timestamp(ts_comb[startidx:], ts_chunked) 
-    )
+
+    startidx = np.argmin(abs(ts_chunked.min() - ts_comb))
+
+    ts_idx = find_nearest_timestamp(ts_comb[startidx:], ts_chunked)
 
     ts_chunked = ts_chunked[ts_idx]
     Datain = Datain[ts_idx]
-    
+
     endidx = startidx + len(ts_chunked)
 
     out_cat_copy = np.copy(out_cat)
@@ -366,10 +337,10 @@ def trunk_process(cls,
     # zSqsum = Datain[:, 13]
     # xzsum = Datain[:, 14]
 
-    #Flip of trunk. Flip should be extracted from reference position. 
+    # Flip of trunk. Flip should be extracted from reference position.
     Mean = array(Mean)
 
-    # #access trunk reference position in parameters 
+    # #access trunk reference position in parameters
 
     # TrunkRefAcc = parameters['TrunkRefAcc']
     # Flip_upsidedown = Flip_UpsideDown(Mean)
@@ -385,9 +356,10 @@ def trunk_process(cls,
     # elif (not Flip_insideout) and Flip_upsidedown:
     #     Mean[:, -3:] = Mean[:, -3:] * np.array([-1, -1, 1])
 
-    
     # Calculate Euclidean length of the modified accelerometer data
-    Lng = np.sqrt(array(np.square(Mean[:, 0]) + np.square(Mean[:, 1]) + np.square(Mean[:, 2])))
+    Lng = np.sqrt(
+        array(np.square(Mean[:, 0]) + np.square(Mean[:, 1]) + np.square(Mean[:, 2]))
+    )
 
     # Compute angles from the modified accelerometer data
     Inc = np.arccos(array(np.divide(Mean[:, 0], Lng)))
@@ -395,10 +367,10 @@ def trunk_process(cls,
     Lat = -np.arcsin(array(np.divide(Mean[:, 1], Lng)))
 
     angles = np.column_stack((Inc, FB, Lat))
-    
-    #Reference angle. Iteratively? Check if Trunk ref exists in parameters?
-    if parameters['TrunkRef'] is None: #probably an index instead
-        if sum(out_cat)>0:
+
+    # Reference angle. Iteratively? Check if Trunk ref exists in parameters?
+    if parameters["TrunkRef"] is None:  # probably an index instead
+        if sum(out_cat) > 0:
             v2 = np.median(FB[out_cat_copy == 5]) - (np.pi * 6 / 180)
             v3 = np.median(Lat[out_cat_copy == 5])
             Trunkref = np.array([np.arccos(v2) * np.cos(v3), v2, v3])
@@ -407,7 +379,6 @@ def trunk_process(cls,
     else:
         Trunkref = parameters["TrunkRef"]
 
-    
     # Create rotation matrix for trunk data
     Rot1 = np.array(
         [
@@ -427,7 +398,7 @@ def trunk_process(cls,
 
     # Rotate the trunk data
     MeanRot = np.matmul(Mean, Rot)
-    
+
     # Compute rotated angles
     VTrunkRot = np.column_stack(
         (
@@ -437,21 +408,19 @@ def trunk_process(cls,
         )
     )
 
-    TrunkInc = VTrunkRot[:,0] #Trunk Inclination
-    TrunkFB = VTrunkRot[:,1] #Trunk FB
-    TrunkLat = VTrunkRot[:,2] #Trunk Lateral
+    TrunkInc = VTrunkRot[:, 0]  # Trunk Inclination
+    TrunkFB = VTrunkRot[:, 1]  # Trunk FB
+    TrunkLat = VTrunkRot[:, 2]  # Trunk Lateral
 
     TrunkInc[NonWear == 1] = np.nan
     TrunkFB[NonWear == 1] = np.nan
     TrunkLat[NonWear == 1] = np.nan
 
-    out_val[startidx:endidx, 1] = TrunkInc * (180/np.pi)
-    out_val[startidx:endidx, 2] = TrunkFB * (180/np.pi)
-    out_val[startidx:endidx, 3] = TrunkLat * (180/np.pi)
+    out_val[startidx:endidx, 1] = TrunkInc * (180 / np.pi)
+    out_val[startidx:endidx, 2] = TrunkFB * (180 / np.pi)
+    out_val[startidx:endidx, 3] = TrunkLat * (180 / np.pi)
 
-
-    if sum(out_cat)>0: # check if thigh_process has run
-
+    if sum(out_cat) > 0:  # check if thigh_process has run
         Akt = out_cat_copy
         IncTrunk = out_val[startidx:endidx, 1]
         FBTrunk = out_val[startidx:endidx, 2]
@@ -462,21 +431,32 @@ def trunk_process(cls,
 
         Akt[Akt == 1] = 2  # Turn every lie back to sit
 
-
-        Akt[np.all([Akt == 2, TrunkLie], axis=0)] = 1  # Let only trunk angle determine lying
+        Akt[np.all([Akt == 2, TrunkLie], axis=0)] = (
+            1  # Let only trunk angle determine lying
+        )
 
         Ibackwards45 = np.any(
-            [FBTrunk < -45,
-                abs(LatTrunk) > 45], axis=0,)
+            [FBTrunk < -45, abs(LatTrunk) > 45],
+            axis=0,
+        )
 
         Akt[np.all([Akt == 2, Ibackwards45 == 1, ~np.isnan(IncTrunk)], axis=0)] = 1
-        
-        Akt[np.all([Akt == 1,
+
+        Akt[
+            np.all(
+                [
+                    Akt == 1,
                     ~np.isnan(IncTrunk),
                     FBTrunk > 0,
-                    FBThigh > 45,], 
-                    axis=0,)] = 2
-        Akt[np.all([Akt == 1,
+                    FBThigh > 45,
+                ],
+                axis=0,
+            )
+        ] = 2
+        Akt[
+            np.all(
+                [
+                    Akt == 1,
                     ~np.isnan(IncTrunk),
                     abs(IncTrunk - FBTrunk) < 10,
                     IncTrunk < 65,
@@ -485,7 +465,7 @@ def trunk_process(cls,
                 axis=0,
             )
         ] = 2
-        
+
         Akt = BoutFilter(Akt, "sit")
         Akt = BoutFilter(Akt, "lie")
 
@@ -494,30 +474,23 @@ def trunk_process(cls,
     return out_cat, out_val
 
 
-def arm_process(cls,
-    ts_list,
-    data_list,
-    parameters,
-    out_cat,
-    out_val,
-    out_ver,
-    ts_comb):
+def arm_process(
+    cls, ts_list, data_list, parameters, out_cat, out_val, out_ver, ts_comb
+):
 
     ts_chunked = ts_list[2]
     Datain = data_list[2][:, 1:] * 0.000001
 
     ts_chunked = ts_chunked[np.argsort(ts_chunked)]
     Datain = Datain[np.argsort(ts_chunked)]
-    
-    startidx = np.argmin(abs(ts_chunked.min()-ts_comb))
-    
-    ts_idx = (
-        find_nearest_timestamp(ts_comb[startidx:], ts_chunked) 
-    )
+
+    startidx = np.argmin(abs(ts_chunked.min() - ts_comb))
+
+    ts_idx = find_nearest_timestamp(ts_comb[startidx:], ts_chunked)
 
     ts_chunked = ts_chunked[ts_idx]
     Datain = Datain[ts_idx]
-    
+
     endidx = startidx + len(ts_chunked)
 
     Stdx = Datain[:, 0]
@@ -542,7 +515,7 @@ def arm_process(cls,
     if FlipUD_arm:
         Mean[:, -3:] = Mean[:, -3:] * np.array([-1, -1, 1])
 
-    #Reference angle for ARM???
+    # Reference angle for ARM???
 
     Lng = np.sqrt(np.square(Mean[:, 0]) + np.square(Mean[:, 1]) + np.square(Mean[:, 2]))
 
@@ -554,19 +527,15 @@ def arm_process(cls,
 
     ArmInc[NonWear == 1] = np.nan
 
-    out_val[startidx:endidx, 4] = ArmInc * (180/np.pi)
+    out_val[startidx:endidx, 4] = ArmInc * (180 / np.pi)
 
     return out_val
-    
-
-
-
 
 
 def Compute_Exposures(cat, val):
     """
-    Compute the exposures needed for the ErgoConnect project, based on the 1Hz data 
-    output from step 2. 
+    Compute the exposures needed for the ErgoConnect project, based on the 1Hz data
+    output from step 2.
 
 
     Parameters
@@ -575,7 +544,7 @@ def Compute_Exposures(cat, val):
         length same as ts.
     val : numpy array
         with columns corresponding to
-        ["activity/steps/count", "angle/TrunkInc", 
+        ["activity/steps/count", "angle/TrunkInc",
          "angle/TrunkFB", "angle/TrunkLat", "angle/ArmInc"].
 
     Returns
@@ -587,44 +556,49 @@ def Compute_Exposures(cat, val):
 
     import numpy as np
     import pandas as pd
-    
-    out = np.c_[cat, val] 
-    out = pd.DataFrame(out, columns=['Activity', 'TrunkInc', "TrunkFB", "TrunkLat", "ArmInc"])
 
-    out['Sedentary_time'] = np.any([out.Activity == 1, out.Activity == 2], axis=0)*1
-    out['Standing_time'] = np.any([out.Activity == 3, out.Activity == 4], axis=0)*1
-    out['Walking_time'] = (out.Activity == 5)*1
+    out = np.c_[cat, val]
+    out = pd.DataFrame(
+        out,
+        columns=["Activity", "Step count", "TrunkInc", "TrunkFB", "TrunkLat", "ArmInc"],
+    )
 
+    out["Sedentary_time"] = np.any([out.Activity == 1, out.Activity == 2], axis=0) * 1
+    out["Standing_time"] = np.any([out.Activity == 3, out.Activity == 4], axis=0) * 1
+    out["Walking_time"] = (out.Activity == 5) * 1
 
-    #Nrisesit
-    DiffAkt = (out["Activity"].isin([1,2]) * 1).to_numpy()
+    # Nrisesit
+    DiffAkt = (out["Activity"].isin([1, 2]) * 1).to_numpy()
     DiffAkt = np.diff(DiffAkt, prepend=DiffAkt[0])
-    out['Rise_from_sedentary_number'] = (DiffAkt == -1)*1
+    out["Rise_from_sedentary_number"] = (DiffAkt == -1) * 1
 
     ThresTrunk = np.array([30, 60, 180])
     ThresArm = np.array([30, 60, 90, 180])
 
     for idx in range(len(ThresTrunk) - 1):
-        out[f'Forward_Bending_{ThresTrunk[idx]}_to_{ThresTrunk[idx+1]}_time'] = np.all(
-            [
-                out.Activity > 2,
-                out.Activity < 8,
-                out.TrunkFB > 0,
-                out.TrunkInc >= ThresTrunk[idx],
-                out.TrunkInc <= ThresTrunk[idx + 1],
-            ],
-            axis=0,
-        )*1
-    forward45 = np.all(
-            [
-                out.Activity > 2,
-                out.Activity < 8,
-                out.TrunkFB > 0,
-                out.TrunkInc >= 45,
-                out.TrunkInc <= 180,
-            ],
-            axis=0,
+        out[f"Forward_Bending_{ThresTrunk[idx]}_to_{ThresTrunk[idx+1]}_time"] = (
+            np.all(
+                [
+                    out.Activity > 2,
+                    out.Activity < 8,
+                    out.TrunkFB > 0,
+                    out.TrunkInc >= ThresTrunk[idx],
+                    out.TrunkInc <= ThresTrunk[idx + 1],
+                ],
+                axis=0,
+            )
+            * 1
         )
+    forward45 = np.all(
+        [
+            out.Activity > 2,
+            out.Activity < 8,
+            out.TrunkFB > 0,
+            out.TrunkInc >= 45,
+            out.TrunkInc <= 180,
+        ],
+        axis=0,
+    )
 
     # out['forward45'] = forward45
     Diff45 = np.diff(forward45, prepend=0)
@@ -633,25 +607,27 @@ def Compute_Exposures(cat, val):
     # Slut = (np.array(np.nonzero(Diff45 == -1)) - 1)[0]
     # SSdur = Slut - Start + 1
 
-    # crossing 45 from below 
-    #up45 = (np.array(angles[1:]) > 45) & (np.array(angles[:-1]) <= 45)
+    # crossing 45 from below
+    # up45 = (np.array(angles[1:]) > 45) & (np.array(angles[:-1]) <= 45)
     # up45 = np.insert(up45, 0, 0)
-    #crossing 30 from above
-    #down30 = (np.array(angles[1:]) < 30) & (np.array(angles[:-1]) >= 30)
-    #down30 = np.insert(down30, 0, 0)
+    # crossing 30 from above
+    # down30 = (np.array(angles[1:]) < 30) & (np.array(angles[:-1]) >= 30)
+    # down30 = np.insert(down30, 0, 0)
 
-    out['Forward_Bending_45_to_180_number'] = (Diff45 == 1)*1
+    out["Forward_Bending_45_to_180_number"] = (Diff45 == 1) * 1
 
     for idx in range(len(ThresArm) - 1):
-        out[f'Arm_Lifting_{ThresArm[idx]}_to_{ThresArm[idx+1]}_time'] = np.all(
-            [
-                out.Activity > 2,
-                out.Activity < 6,
-                out.ArmInc >= ThresArm[idx],
-                out.ArmInc <= ThresArm[idx + 1],
-            ],
-            axis=0,
-        )*1
+        out[f"Arm_Lifting_{ThresArm[idx]}_to_{ThresArm[idx+1]}_time"] = (
+            np.all(
+                [
+                    out.Activity > 2,
+                    out.Activity < 6,
+                    out.ArmInc >= ThresArm[idx],
+                    out.ArmInc <= ThresArm[idx + 1],
+                ],
+                axis=0,
+            )
+            * 1
+        )
 
     return out
-

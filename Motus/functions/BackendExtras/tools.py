@@ -124,7 +124,6 @@ def acti4pre_csv(ts_chunked, out_cat, out_val, i, sensor_id):
 
 # Generate csv report - tailored for alg_chunk_acti4pre_v1_1_3.py
 def motuspre_merge_outputs(ts_chunked, out_cat, out_val, i):
-
     # Convert ts_chunked
     datetime_objects = [
         datetime.utcfromtimestamp(t / 1000).strftime("%Y-%m-%d %H:%M:%S.%f")
@@ -193,36 +192,29 @@ def activity_motus_csv(out_ts, out_cat, out_val, day, selected_id, res_folder, v
     cols = [
         "out_ts",
         "out_cat",
-        "Steps", 
+        "Steps",
     ]
-    if ver == "ergoconnect":
-        cols += [ 
-            "TrunkInc", 
-            "TrunkFB", 
-            "TrunkLat", 
-            "ArmInc", 
+    if ver == "3sensors":
+        cols += [
+            "TrunkInc",
+            "TrunkFB",
+            "TrunkLat",
+            "ArmInc",
         ]
-    
+
     # Create a DataFrame using the arrays
-    data = np.concatenate([
-        out_ts,
-        out_cat,
-        out_val
-    ],axis=1)
-    activity_motus = pd.DataFrame(
-        data,
-        columns=cols
-    )
+    data = np.concatenate([out_ts, out_cat, out_val], axis=1)
+    activity_motus = pd.DataFrame(data, columns=cols)
     activity_motus["out_ts_iso"] = datetime_objects
     # Create the directory if it doesn't exist
-    directory = os.path.join(
-        res_folder, f"{selected_id}\\poststep"
-    )
+    directory = os.path.join(res_folder, f"{selected_id}\\poststep")
     if not os.path.exists(directory):
         os.makedirs(directory)
 
     # Append to CSV
-    activity_motus.to_csv(f"{directory}\\activity_chunk_{day:%Y_%m_%d}.csv", index=False)
+    activity_motus.to_csv(
+        f"{directory}\\activity_chunk_{day:%Y_%m_%d}.csv", index=False
+    )
 
     return activity_motus
 
@@ -357,17 +349,16 @@ def extract_id_placements(id, src_folder):
     except:
         file_plc = ["thigh"]
     files = {
-        {
-            "lår": "thigh", 
-            "ryg": "trunk", 
-            "læg": "calf",
-            "arm": "arm"
-        }.get(file_plc[i].lower(), file_plc[i].lower()): file
+        {"lår": "thigh", "ryg": "trunk", "læg": "calf", "arm": "arm"}.get(
+            file_plc[i].lower(), file_plc[i].lower()
+        ): file
         for i, file in enumerate(files)
     }
     return files
 
+
 # ===========================================================================================================================================================
+
 
 # function for generating range of timestamps from first chunk to last (across all placements)
 def generate_timestamp_range(start_timestamp, end_timestamp):
@@ -376,18 +367,29 @@ def generate_timestamp_range(start_timestamp, end_timestamp):
         yield current_timestamp
         current_timestamp += timedelta(hours=12)
 
+
 # function to add index of list of chunk where sensor has first data from
-def get_chunk_start_idx(chunk_dict,selected_placements):
+def get_chunk_start_idx(chunk_dict, selected_placements):
     # lists to store first timestamps from first and last chunk
     start_first = []
     start_last = []
     for plc in selected_placements:
         # Get timestamps from first and last chunk (add 10 minutes do to overlaps)
-        chunk_start = chunk_dict[plc]['list_of_df'][0].iloc[0,0]+timedelta(minutes=10)
-        chunk_end = chunk_dict[plc]['list_of_df'][-1].iloc[0,0]+timedelta(minutes=10)
-        # Floor to timestamp to 12:00 or 00:00 
-        chunk_start_clean = chunk_start - timedelta(hours=chunk_start.hour % 12, minutes=chunk_start.minute, seconds=chunk_start.second)
-        chunk_end_clean = chunk_end - timedelta(hours=chunk_end.hour % 12, minutes=chunk_end.minute, seconds=chunk_end.second)
+        chunk_start = chunk_dict[plc]["list_of_df"][0].iloc[0, 0] + timedelta(
+            minutes=10
+        )
+        chunk_end = chunk_dict[plc]["list_of_df"][-1].iloc[0, 0] + timedelta(minutes=10)
+        # Floor to timestamp to 12:00 or 00:00
+        chunk_start_clean = chunk_start - timedelta(
+            hours=chunk_start.hour % 12,
+            minutes=chunk_start.minute,
+            seconds=chunk_start.second,
+        )
+        chunk_end_clean = chunk_end - timedelta(
+            hours=chunk_end.hour % 12,
+            minutes=chunk_end.minute,
+            seconds=chunk_end.second,
+        )
         # Append to lists
         start_first.append(chunk_start_clean)
         start_last.append(chunk_end_clean)
@@ -404,27 +406,39 @@ def get_chunk_start_idx(chunk_dict,selected_placements):
     # For each placement find out where in above range first chunk appears
     for plc in selected_placements:
         for i, ts in enumerate(timestamp_range):
-            chunk_start = chunk_dict[plc]['list_of_df'][0].iloc[0,0]+timedelta(minutes=10)
-            if chunk_start < ts+timedelta(hours=12):
+            chunk_start = chunk_dict[plc]["list_of_df"][0].iloc[0, 0] + timedelta(
+                minutes=10
+            )
+            if chunk_start < ts + timedelta(hours=12):
                 start_idx[plc] = i
                 break
 
     # Add Nones before in list of chunks
     for plc in selected_placements:
-        miss_chunk_end = len(timestamp_range) - (start_idx[plc] + len(chunk_dict[plc]["list_of_df"]))
+        miss_chunk_end = len(timestamp_range) - (
+            start_idx[plc] + len(chunk_dict[plc]["list_of_df"])
+        )
         chunk_dict[plc]["list_of_df"] = (
-            [None for i in range(start_idx[plc])] + # Add Nones for chunks before first chunk
-            chunk_dict[plc]["list_of_df"] + # Add chunks
-            [None for i in range(miss_chunk_end)] # Add Nones for chunks after last chunk
+            [
+                None for i in range(start_idx[plc])
+            ]  # Add Nones for chunks before first chunk
+            + chunk_dict[plc]["list_of_df"]  # Add chunks
+            + [
+                None for i in range(miss_chunk_end)
+            ]  # Add Nones for chunks after last chunk
         )
         chunk_dict[plc]["extended_chunks_original_format"] = (
-            [None for i in range(start_idx[plc])] + # Add Nones for chunks before first chunk
-            chunk_dict[plc]["extended_chunks_original_format"] + # Add chunks
-            [None for i in range(miss_chunk_end)] # Add Nones for chunks after last chunk
+            [
+                None for i in range(start_idx[plc])
+            ]  # Add Nones for chunks before first chunk
+            + chunk_dict[plc]["extended_chunks_original_format"]  # Add chunks
+            + [
+                None for i in range(miss_chunk_end)
+            ]  # Add Nones for chunks after last chunk
         )
 
-
     return chunk_dict, timestamp_range
+
 
 # ===========================================================================================================================================================
 
@@ -876,9 +890,11 @@ def process_pre_step_data(out_pre_all_chunks):
 
     # Convert the list of lists to a list of dictionaries
     out_pre_all_chunks_dicts = [
-        list(map(lambda x: dict(zip(column_names, x)), chunk))
-        if chunk is not None
-        else None
+        (
+            list(map(lambda x: dict(zip(column_names, x)), chunk))
+            if chunk is not None
+            else None
+        )
         for chunk in out_pre_all_chunks
     ]
 
@@ -902,14 +918,14 @@ def process_pre_step_data(out_pre_all_chunks):
                 out_pre_all_chunks_modified.append(
                     out_pre_all_chunks_dicts[i][:-rows_to_remove_ending]
                 )
-    
+
             # If the chunk is the last chunk in the list
             elif i == len(out_pre_all_chunks_dicts) - 1:
                 # Remove the first ten minutes of data
                 out_pre_all_chunks_modified.append(
                     out_pre_all_chunks_dicts[i][rows_to_remove_beginning:]
                 )
-    
+
             # If the chunk is any other chunk in the list
             else:
                 # Remove the first and last ten minutes of data
@@ -919,9 +935,7 @@ def process_pre_step_data(out_pre_all_chunks):
                     ]
                 )
         else:
-            out_pre_all_chunks_modified.append(
-                None
-            )
+            out_pre_all_chunks_modified.append(None)
 
     # Create an empty list to store the numpy arrays
     out_pre_all_chunks_arrays = []
@@ -931,13 +945,9 @@ def process_pre_step_data(out_pre_all_chunks):
         out_pre_all_chunks_lists = []
         if dictionary is not None:
             for row in dictionary:
-                out_pre_all_chunks_lists.append(
-                    [row[col] for col in column_names] 
-                )
+                out_pre_all_chunks_lists.append([row[col] for col in column_names])
         else:
-            out_pre_all_chunks_lists.append(
-                None
-            )
+            out_pre_all_chunks_lists.append(None)
 
         # Convert list of lists to numpy array
         # out_pre_all_chunks_array = np.array(out_pre_all_chunks_lists, dtype=np.int64)

@@ -472,9 +472,9 @@ def main_multiple(
         # Check if the calf accelerometer is flipped upside down or inside out
         FlipUD_Calf = Flip_UpsideDown(AccCalf)
         if FlipUD_Calf:
-            AccCalf[:,-3:] = AccCalf[:,-3:]*np.array([-1, -1, 1])
+            AccCalf[:, -3:] = AccCalf[:, -3:] * np.array([-1, -1, 1])
         # FlipIO_Calf = Flip_InsideOut_Timeless(AccCalf)  # Note: The comment suggests this may not make sense, consider reviewing or removing
-        
+
         MeanCalf, StdCalf, _ = downsample(AccCalf, SF, SF12)
         MeanThigh, StdThigh, _ = downsample(AccThigh, SF, SF12)
 
@@ -483,10 +483,8 @@ def main_multiple(
 
         # Detect kneeling
         Akt = KneelSquatDetection(Akt, MeanThigh, MeanCalf)
-        
-    
-    return Akt, Time, Std, Fstep, TrunkBending, ArmLifting, VTrunkRot_out, Varm_out
 
+    return Akt, Time, Std, Fstep, TrunkBending, ArmLifting, VTrunkRot_out, Varm_out
 
 
 def Acc60(Acc, SF):
@@ -526,7 +524,19 @@ def Acc60(Acc, SF):
     return Acc12
 
 
-def downsample(Acc, SF, SF12):
+def adjust_std(Std, SF12):
+    import numpy as np
+
+    # SENS sensor correction (different corrections for 25Hz and 12.5Hz)
+    Std = (
+        0.18 * np.square(Std) + 1.03 * Std
+        if not SF12
+        else 0.02 * np.square(Std) + 1.14 * Std
+    )
+    return Std
+
+
+def downsample(Acc, SF):
     """
     Takes the 30Hz data down to 1Hz. This function is a collection of code previously present in
     other functions.
@@ -538,8 +548,6 @@ def downsample(Acc, SF, SF12):
         Acceleration data.
     SF : int
         System sampling frequency (30Hz).
-    SF12 : Bool
-        Whether data comes from a 12.5Hz sensor or not.
 
     Returns
     -------
@@ -566,13 +574,6 @@ def downsample(Acc, SF, SF12):
     Std = np.std(
         Acc12, axis=0, ddof=1
     )  # compute standard deviation of columns. The array is automatically squeezed intop a 2d array
-
-    # SENS sensor correction (different corrections for 25Hz and 12.5Hz)
-    Std = (
-        0.18 * np.square(Std) + 1.03 * Std
-        if not SF12
-        else 0.02 * np.square(Std) + 1.14 * Std
-    )
 
     Mean = np.mean(Acc12, axis=0)  # compute mean of 2 sec intervals
 

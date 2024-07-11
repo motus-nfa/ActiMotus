@@ -37,9 +37,6 @@
             Detects reference angle (deprecateds)
 """
 
-# Imports
-from functions.backendfunctions import array
-
 
 def read_bin(name):
     """
@@ -118,11 +115,11 @@ def AdjustRawBinData(Acc, ts=None):
         idx = 0
 
     # Add timexone difference if not utc
-    
+
     Tsens = 719529.0 + ts / 1000 / 86400
     Start = [719529.0 + ts[0] / 1000 / 86400]
 
-    #upsampling frequency
+    # upsampling frequency
     SF = 30
 
     # Create a time vector (TimeT) with regular intervals based on the timestamps and sample frequency (SF)
@@ -806,3 +803,25 @@ def find_ref_angle_unix(AccAutoCal, Actout, TimeT, timezone):
     LatAngle = -(180 / np.pi) * np.arcsin(y1 / np.sqrt(x1**2 + y1**2 + z1**2))
 
     return LatAngle, median_angle
+
+
+def array(*args, **kwargs):
+    import numpy as np
+
+    """
+    Create a NumPy array with default dtype set to np.float32.
+
+    Parameters
+    ----------
+    *args : array_like
+        Positional arguments passed to np.array.
+    **kwargs : dict
+        Keyword arguments passed to np.array.
+
+    Returns
+    -------
+    np.ndarray
+        NumPy array with the specified arguments and default dtype.
+    """
+    kwargs.setdefault("dtype", np.float32)
+    return np.array(*args, **kwargs)
