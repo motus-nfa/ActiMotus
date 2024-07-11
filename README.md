@@ -66,7 +66,7 @@ The current stable and integrated version of ActiMotus is 2.0.0
 For an overview of versions and compatibilities please review [our version overwiev](./doc/Versions.txt).
 
 ## Get in touch
-If you want to use Motus or are interested in knowing more, please contact motus@nfa.dk with your request and contact information.  
+If you want to use Motus or are interested in knowing more, please contact motus@nfa.dk.  
 
 ## Contributions and license
 ActiMotus is published under the [BSD 3-Clause License](./LICENSE).  
