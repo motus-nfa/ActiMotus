@@ -54,7 +54,6 @@ In the second step, the sensor placement is revealed and, depending on this, dif
 ### Sensor placements
 
 - **Thigh** enables the primary activity classification.
-- **Calf** sensor adds the ability to detect kneeling and squatting.
 - **Upper back** enchances the detection of lying compared to thigh-only measures. Further, forward bending of the back is measured.
 - **Arm** is used to capture arm inclinations and movement.
 
