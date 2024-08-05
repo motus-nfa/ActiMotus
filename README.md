@@ -21,7 +21,7 @@ If you use ActiMotus in your research please cite the system as follows:
 
 APA
 ```
-The National Research Centre for the Working Environment (NFA). (2024). ActiMotus (2.0.0) [Computer software]. https://github.com/motus-nfa/Motus
+The National Research Centre for the Working Environment (NFA). (2024). ActiMotus (2.0.0) [Computer software]. https://github.com/motus-nfa/ActiMotus
 ```
 
 BibTex
@@ -30,7 +30,7 @@ BibTex
 author = {The National Research Centre for the Working Environment (NFA)},
 month = jul,
 title = {{ActiMotus}},
-url = {https://github.com/motus-nfa/Motus},
+url = {https://github.com/motus-nfa/ActiMotus},
 version = {2.0.0},
 year = {2024}
 }
@@ -62,7 +62,7 @@ New algorithms and sensors are added continuously.
 ## Versions
 ActiMotus is constantly developed and improved.  
 The current stable and integrated version of ActiMotus is 2.0.0  
-For an overview of versions and compatibilities please review [our version overwiev](./doc/Versions.txt).
+For an overview of versions and compatibilities please review [our version overview](./doc/Versions.txt).
 
 ## Get in touch
 If you want to use Motus or are interested in knowing more, please contact motus@nfa.dk.  
