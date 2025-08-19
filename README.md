@@ -1,3 +1,7 @@
+# For the latest implementation of ActiMotus, click here: [acti-motus](https://github.com/acti-motus/acti-motus) 
+
+
+
 <p align="center">
 <img src="./doc/figures/ActiMotuslogo.png" width="300" alt="Motus logo" title="Motus logo">
 </p>
